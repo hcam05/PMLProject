@@ -1,0 +1,118 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "hcam"
+date: "2/9/2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Practical Machine Leraning Course Project
+
+In this assignment we will explore the accelerometer data from the belt, forearm, arm, and dumbell of 6 participants. These participants were asked to perform exercises correctly and incorrectly in 5 different ways. We will use this data to build a model to predict if a user was doing an exercise correctly or not.
+
+Data used for this assignment is courtesy of http://groupware.les.inf.puc-rio.br/har. 
+
+## Loading The Required Packages
+
+```{r packages, results="hide", message=FALSE, warning = FALSE}
+library(tidyverse)
+library(caret)
+library(randomForest)
+library(rpart)
+library(rattle)
+```
+
+## Loading the Data
+
+The training and testing data sets are available the links below.  I will utilize the tidyverse package to load the data via read_csv function.
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+```{r data, results="hide", message=FALSE, warning=FALSE}
+train_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+train <- read_csv(train_url)
+test <- read_csv(test_url)
+```
+
+```{r dim_raw}
+dim(train)
+dim(test)
+```
+##Preparing the Data
+
+We will select the columns without NA values, and also we will filter out the first seven columns of data.  
+
+```{r prep_data, message=FALSE}
+train <- train[, colSums(is.na(train)) == 0] #subset the data for non NA values
+test <- test[, colSums(is.na(test)) == 0] 
+
+train <- train[,-(1:7)] #removing the first seven columns of data.
+test <- test[,-(1:7)]
+```
+
+```{r dim}
+dim(train)
+dim(test)
+```
+
+###Partioning the Training Data
+```{r, part_data, message = FALSE}
+set.seed(555)
+inTrain <- createDataPartition(train$classe, p = 0.75, list = FALSE)
+training <- train[inTrain,]
+testing <- train[-inTrain,]
+```
+
+```{r part_dim}
+dim(training)
+dim(testing)
+```
+
+We will also remove the Zero Covariates. These variables have low variablity and are not useful in our model.
+
+```{r nearzero, message = FALSE }
+nzv <- nearZeroVar(training, saveMetrics = TRUE)
+training <- training[,nzv$nzv == FALSE]
+testing <- testing[,nzv$nzv == FALSE]
+```
+
+###Building our Model
+
+We will use the Random Forest method for our model.  This is one of the most used and accurate algorthims. 
+
+```{r rf_model}
+modFit <- train(classe ~ ., data=training, method="rf", list = FALSE, 
+                trControl = trainControl(method="cv"), number = 5, allowParallel = TRUE)
+```
+
+Now we can test the model on our validation training set.
+
+```{r validation}
+testing_pred <- predict(modFit, testing)
+confusionMatrix(testing$classe, testing_pred)
+```
+
+We can check the accuracy and the out of sample error rate below.
+
+```{r accuracy, echo = FALSE}
+as.numeric(confusionMatrix(testing$classe, testing_pred)$overall[1])
+1-as.numeric(confusionMatrix(testing$classe, testing_pred)$overall[1])
+```
+
+###Prediction on Test Data
+
+We can now apply our model on the test data set provided.
+```{r final}
+test_pred <- predict(modFit, test)
+test_pred
+```
+
+
